@@ -1,0 +1,62 @@
+[
+  {
+    "vehiculo_info": "Ford Focus 2019",
+    "sintomas": ["dificultad_arranque", "luces_debiles"],
+    "kilometraje": 85000,
+    "falla_diagnosticada": "bateria_descargada",
+    "fc_obtenido": 0.92,
+    "accion_realizada": "Reemplazo de batería",
+    "exitoso": true,
+    "fecha": "2025-06-15 10:30:00"
+  },
+  {
+    "vehiculo_info": "Chevrolet Onix 2020",
+    "sintomas": ["testigo_motor", "tirones_aceleracion"],
+    "kilometraje": 62000,
+    "falla_diagnosticada": "bujia_deteriorada",
+    "fc_obtenido": 0.78,
+    "accion_realizada": "Cambio de bujías",
+    "exitoso": true,
+    "fecha": "2025-07-20 14:15:00"
+  },
+  {
+    "vehiculo_info": "Volkswagen Gol 2018",
+    "sintomas": ["freno_blando", "ruido_frenado"],
+    "kilometraje": 110000,
+    "falla_diagnosticada": "freno_desgastado",
+    "fc_obtenido": 0.88,
+    "accion_realizada": "Reemplazo pastillas + discos",
+    "exitoso": true,
+    "fecha": "2025-08-10 09:00:00"
+  },
+  {
+    "vehiculo_info": "Toyota Corolla 2021",
+    "sintomas": ["testigo_motor", "consumo_excesivo"],
+    "kilometraje": 45000,
+    "falla_diagnosticada": "sonda_lambda_danada",
+    "fc_obtenido": 0.72,
+    "accion_realizada": "Reemplazo sonda lambda",
+    "exitoso": true,
+    "fecha": "2025-09-05 11:45:00"
+  },
+  {
+    "vehiculo_info": "Fiat Cronos 2017",
+    "sintomas": ["ruido_chirrido", "luces_debiles"],
+    "kilometraje": 95000,
+    "falla_diagnosticada": "alternador_danado",
+    "fc_obtenido": 0.81,
+    "accion_realizada": "Reconstrucción alternador",
+    "exitoso": false,
+    "fecha": "2025-10-12 16:30:00"
+  },
+  {
+    "vehiculo_info": "Renault Sandero 2020",
+    "sintomas": ["perdida_potencia", "humo_negro_escape"],
+    "kilometraje": 78000,
+    "falla_diagnosticada": "filtro_aire_tapado",
+    "fc_obtenido": 0.76,
+    "accion_realizada": "Cambio filtro de aire",
+    "exitoso": true,
+    "fecha": "2025-11-01 08:20:00"
+  }
+]
