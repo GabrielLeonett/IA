@@ -744,9 +744,26 @@ class Explicador:
         return [(f, fc) for f, fc, _ in items]
 
     def generar_explicacion(self, fallas: dict, reglas_activadas: list[Regla],
-                            sugerencias_ia: str = "") -> str:
+                            sugerencias_ia: str = "", predicciones: list = None) -> str:
         if not fallas:
-            return "No se pudo determinar una falla con suficiente certeza."
+            msg = [
+                "[F] No se pudo determinar una falla con certeza suficiente.",
+                "",
+                "  Los síntomas ingresados no coinciden exactamente con ninguna",
+                "  combinación de reglas en la base de conocimiento.",
+                "",
+            ]
+            if predicciones:
+                msg.append("  Basado en el historial del vehículo, se recomienda revisar:")
+                for nombre, fc, desc in predicciones[:3]:
+                    nom = self.DESCRIPCION_FALLAS.get(nombre, nombre)
+                    msg.append(f"    • {nom} (FC estimada: {fc:.0%})")
+                    msg.append(f"      -> {desc}")
+            if sugerencias_ia:
+                msg.extend(["", "[AI] Sugerencia IA:", "", sugerencias_ia])
+            msg.extend(["", "  Sugerencia: intente agregar más síntomas o códigos OBD-II",
+                       "  para afinar el diagnóstico."])
+            return "\n".join(msg)
 
         fallas_priorizadas = self.priorizar_por_seguridad(fallas)
         principal = fallas_priorizadas[0]
@@ -921,6 +938,12 @@ class AgenteAutomotriz:
 
         fallas_ordenadas = dict(sorted(fallas_filtradas.items(), key=lambda x: -x[1]))
 
+        # Si no hay fallas por reglas, usar predicciones como respaldo
+        if not fallas_ordenadas and vehiculo:
+            predicciones = self.predecir_fallas(vehiculo)
+            for nombre, fc, desc in predicciones[:3]:
+                fallas_ordenadas[nombre] = fc
+
         # Gemini enhancement
         sugerencias_ia = ""
         if self.llm.disponible:
@@ -933,8 +956,10 @@ class AgenteAutomotriz:
 
         urgencia = self.explicador.obtener_urgencia(fallas_ordenadas)
         plan = self.explicador.obtener_plan(fallas_ordenadas)
+        predicciones_vehiculo = self.predecir_fallas(vehiculo) if vehiculo else []
         explicacion = self.explicador.generar_explicacion(
-            fallas_ordenadas, self.ultimas_reglas_activadas, sugerencias_ia
+            fallas_ordenadas, self.ultimas_reglas_activadas, sugerencias_ia,
+            predicciones_vehiculo
         )
 
         # Inventory status
@@ -1051,13 +1076,38 @@ class AgenteAutomotriz:
 
         return predicciones
 
+    def _calcular_costo_con_inventario(self, fallas: list) -> dict:
+        """Calcula costo combinando plan de accion + precios de inventario."""
+        costo_mano_obra = 0.0
+        tiempo_total = 0.0
+        costo_repuestos = 0.0
+        detalle_repuestos = []
+
+        for a in self.ultimo_diagnostico.plan_accion:
+            costo_mano_obra += a.costo_estimado
+            tiempo_total += a.tiempo_estimado_horas
+
+        for nombre, _ in fallas:
+            repuestos = self.inventario.verificar_disponibilidad(nombre)
+            for r in repuestos:
+                if r.get("precio", 0) > 0:
+                    costo_repuestos += r["precio"]
+                    detalle_repuestos.append(f"{r['nombre']}: ${r['precio']:,}")
+
+        return {
+            "costo_repuestos": costo_repuestos,
+            "costo_mano_obra": costo_mano_obra,
+            "costo_total": costo_repuestos + costo_mano_obra,
+            "tiempo_total": tiempo_total,
+            "detalle_repuestos": detalle_repuestos,
+        }
+
     def generar_reporte(self) -> str:
         if not self.ultimo_diagnostico:
             return "No hay diagnóstico previo."
 
         d = self.ultimo_diagnostico
-        costo_total = sum(a.costo_estimado for a in d.plan_accion)
-        tiempo_total = sum(a.tiempo_estimado_horas for a in d.plan_accion)
+        costo = self._calcular_costo_con_inventario(d.fallas)
 
         freq = self.cbr.obtener_frecuencia_fallas()
         alertas_inv = self.inventario.predecir_demanda(freq)
@@ -1099,9 +1149,16 @@ class AgenteAutomotriz:
 
         lineas.extend([
             "",
-            f"  Costo total estimado: ${costo_total:,.0f}",
-            f"  Tiempo total estimado: {tiempo_total:.1f} horas",
         ])
+
+        if costo["detalle_repuestos"]:
+            lineas.append("  --- Desglose de Costos ---")
+            for det in costo["detalle_repuestos"]:
+                lineas.append(f"    Repuesto: {det}")
+            if costo["costo_mano_obra"] > 0:
+                lineas.append(f"    Mano de obra: ${costo['costo_mano_obra']:,.0f}")
+        lineas.append(f"  Costo total estimado: ${costo['costo_total']:,.0f}")
+        lineas.append(f"  Tiempo total estimado: {costo['tiempo_total']:.1f} horas")
 
         if alertas_inv:
             lineas.extend([
