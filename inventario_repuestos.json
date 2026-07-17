@@ -1,4 +1,38 @@
 {
+  "herramientas": {
+    "items": [
+      {
+        "nombre": "Escaner OBD-II",
+        "stock": 2,
+        "stock_minimo": 1,
+        "precio": 0
+      },
+      {
+        "nombre": "Multimetro digital",
+        "stock": 3,
+        "stock_minimo": 1,
+        "precio": 0
+      },
+      {
+        "nombre": "Juego de llaves mixtas",
+        "stock": 2,
+        "stock_minimo": 1,
+        "precio": 0
+      },
+      {
+        "nombre": "Gato hidraulico 2T",
+        "stock": 1,
+        "stock_minimo": 1,
+        "precio": 0
+      },
+      {
+        "nombre": "Compresor de aire",
+        "stock": 0,
+        "stock_minimo": 1,
+        "precio": 0
+      }
+    ]
+  },
   "bateria_descargada": {
     "repuestos": [
       {
@@ -7,7 +41,9 @@
         "precio": 8500,
         "proveedor": "Bosch",
         "stock_minimo": 2,
-        "tiempo_entrega_dias": 1
+        "tiempo_entrega_dias": 1,
+        "disponible": true,
+        "alerta_stock": false
       }
     ]
   },

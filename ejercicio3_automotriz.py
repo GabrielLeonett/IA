@@ -432,6 +432,15 @@ class GestorInventario:
                     {"nombre": "Filtro de aceite", "stock": 8, "precio": 800,
                      "proveedor": "Mann-Filter", "stock_minimo": 5, "tiempo_entrega_dias": 1}
                 ]
+            },
+            "herramientas": {
+                "items": [
+                    {"nombre": "Escaner OBD-II", "stock": 2, "stock_minimo": 1, "precio": 0},
+                    {"nombre": "Multimetro digital", "stock": 3, "stock_minimo": 1, "precio": 0},
+                    {"nombre": "Juego de llaves mixtas", "stock": 2, "stock_minimo": 1, "precio": 0},
+                    {"nombre": "Gato hidraulico 2T", "stock": 1, "stock_minimo": 1, "precio": 0},
+                    {"nombre": "Compresor de aire", "stock": 0, "stock_minimo": 1, "precio": 0}
+                ]
             }
         }
 
@@ -486,14 +495,120 @@ class GestorInventario:
         lineas = []
         for falla_id, info in self.inventario.items():
             for r in info.get("repuestos", []):
-                estado = "✅" if r["stock"] > r.get("stock_minimo", 1) else \
-                         "⚠️" if r["stock"] > 0 else "🔴"
+                estado = "[OK]" if r["stock"] > r.get("stock_minimo", 1) else \
+                         "[!]" if r["stock"] > 0 else "[X]"
                 lineas.append(
                     f"  {estado} {r['nombre']:40s} stock: {r['stock']:2d} | "
                     f"mín: {r.get('stock_minimo', 1)} | ${r['precio']:>5,.0f}"
                 )
         if not lineas:
             return "  (vacío)"
+        return "\n".join(lineas)
+
+    def resumen_herramientas(self) -> str:
+        lineas = []
+        herramientas = self.inventario.get("herramientas", {}).get("items", [])
+        for h in herramientas:
+            estado = "DISPONIBLE" if h["stock"] > h.get("stock_minimo", 1) else \
+                     "STOCK BAJO" if h["stock"] > 0 else "AGOTADO"
+            icono = "[OK]" if h["stock"] > h.get("stock_minimo", 1) else \
+                    "[!]" if h["stock"] > 0 else "[NO]"
+            lineas.append(
+                f"  {icono} {h['nombre']:30s} stock: {h['stock']:2d}  [{estado}]"
+            )
+        if not lineas:
+            return "  (sin herramientas registradas)"
+        return "\n".join(lineas)
+
+    def verificar_herramienta(self, nombre: str) -> dict | None:
+        herramientas = self.inventario.get("herramientas", {}).get("items", [])
+        for h in herramientas:
+            if h["nombre"].lower() == nombre.lower():
+                return {
+                    "nombre": h["nombre"],
+                    "disponible": h["stock"] > 0,
+                    "stock": h["stock"],
+                    "stock_minimo": h.get("stock_minimo", 1)
+                }
+        return None
+
+    def consumir_herramienta(self, nombre: str) -> bool:
+        herramientas = self.inventario.get("herramientas", {}).get("items", [])
+        for h in herramientas:
+            if h["nombre"].lower() == nombre.lower():
+                if h["stock"] <= 0:
+                    return False
+                h["stock"] -= 1
+                self._guardar()
+                return True
+        return False
+
+    def stock_critico(self) -> list[dict]:
+        criticos = []
+        # Revisar herramientas
+        herramientas = self.inventario.get("herramientas", {}).get("items", [])
+        for h in herramientas:
+            if h["stock"] <= 0:
+                criticos.append({
+                    "tipo": "herramienta",
+                    "nombre": h["nombre"],
+                    "stock": h["stock"],
+                    "minimo": h.get("stock_minimo", 1)
+                })
+            elif h["stock"] <= h.get("stock_minimo", 1):
+                criticos.append({
+                    "tipo": "herramienta",
+                    "nombre": h["nombre"],
+                    "stock": h["stock"],
+                    "minimo": h.get("stock_minimo", 1),
+                    "alerta": "stock bajo"
+                })
+        # Revisar repuestos
+        for falla_id, info in self.inventario.items():
+            if falla_id == "herramientas":
+                continue
+            for r in info.get("repuestos", []):
+                if r["stock"] <= 0:
+                    criticos.append({
+                        "tipo": "repuesto",
+                        "falla": falla_id,
+                        "nombre": r["nombre"],
+                        "stock": r["stock"],
+                        "minimo": r.get("stock_minimo", 1)
+                    })
+                elif r["stock"] <= r.get("stock_minimo", 1):
+                    criticos.append({
+                        "tipo": "repuesto",
+                        "falla": falla_id,
+                        "nombre": r["nombre"],
+                        "stock": r["stock"],
+                        "minimo": r.get("stock_minimo", 1),
+                        "alerta": "stock bajo"
+                    })
+        return criticos
+
+    def resumen_taller(self) -> str:
+        lineas = [
+            "",
+            "--- HERRAMIENTAS DEL TALLER ---",
+            self.resumen_herramientas(),
+        ]
+        criticos = self.stock_critico()
+        if criticos:
+            lineas.extend([
+                "",
+                "--- ALERTAS CRITICAS ---",
+            ])
+            for c in criticos:
+                if c.get("alerta") == "stock bajo":
+                    lineas.append(
+                        f"  [!]  {c['nombre']} — stock: {c['stock']}, "
+                        f"minimo: {c['minimo']} — REPONER PRONTO"
+                    )
+                else:
+                    lineas.append(
+                        f"  [NO] {c['nombre']} — SIN STOCK (minimo: {c['minimo']})"
+                    )
         return "\n".join(lineas)
 
 
@@ -643,28 +758,28 @@ class Explicador:
         }
 
         partes = [
-            "╔══════════════════════════════════════════════════════╗",
-            "║          DIAGNÓSTICO AUTOMOTRIZ                     ║",
-            "╚══════════════════════════════════════════════════════╝",
+            "==══════════════════════════════════════════════════════==",
+            "||          DIAGNÓSTICO AUTOMOTRIZ                     ||",
+            "==══════════════════════════════════════════════════════==",
             "",
-            f"🔧 Falla principal: {self.DESCRIPCION_FALLAS.get(principal[0], principal[0])}",
-            f"📊 Certeza (FC): {principal[1]:.1%}",
-            f"⚠️  {etiqueta_urgencia.get(urgencia, '')}",
+            f"[F] Falla principal: {self.DESCRIPCION_FALLAS.get(principal[0], principal[0])}",
+            f"[FC] Certeza (FC): {principal[1]:.1%}",
+            f"[!]  {etiqueta_urgencia.get(urgencia, '')}",
             "",
         ]
 
-        partes.append("📋 Reglas activadas:")
+        partes.append("[L] Reglas activadas:")
         for falla_nombre, _ in fallas_priorizadas[:3]:
             reglas_falla = [r for r in reglas_activadas if r.conclusion == falla_nombre]
             for r in reglas_falla:
                 conds = ", ".join(f"{k}={v}" for k, v in r.condiciones.items())
-                partes.append(f"  • SI [{conds}] → {falla_nombre} (FC={r.fc})")
+                partes.append(f"  • SI [{conds}] -> {falla_nombre} (FC={r.fc})")
 
         if sugerencias_ia:
-            partes.extend(["", "🤖 Análisis mejorado por IA:", "", sugerencias_ia])
+            partes.extend(["", "[AI] Análisis mejorado por IA:", "", sugerencias_ia])
 
         if len(fallas) > 1:
-            partes.extend(["", "📋 Otras fallas consideradas:"])
+            partes.extend(["", "[L] Otras fallas consideradas:"])
             for nombre, fc in list(fallas_priorizadas)[1:4]:
                 desc = self.DESCRIPCION_FALLAS.get(nombre, nombre)
                 sist = self.SISTEMAS.get(nombre, "")
@@ -837,22 +952,57 @@ class AgenteAutomotriz:
 
     def _generar_estado_inventario(self, fallas: dict) -> str:
         lineas = []
+
+        # Herramientas necesarias para el diagnostico
+        herramientas_necesarias = {
+            "bateria_descargada": ["Multimetro digital"],
+            "alternador_danado": ["Multimetro digital"],
+            "bujia_deteriorada": ["Juego de llaves mixtas"],
+            "filtro_aire_tapado": ["Juego de llaves mixtas"],
+            "correa_distribucion_desgastada": ["Juego de llaves mixtas", "Gato hidraulico 2T"],
+            "inyector_sucio": ["Juego de llaves mixtas"],
+            "freno_desgastado": ["Juego de llaves mixtas", "Gato hidraulico 2T"],
+            "termostato_danado": ["Juego de llaves mixtas"],
+            "sonda_lambda_danada": ["Juego de llaves mixtas"],
+            "valvula_egr_tapada": ["Juego de llaves mixtas"],
+            "bomba_direccion_danada": ["Juego de llaves mixtas", "Gato hidraulico 2T"],
+            "catalizador_danado": ["Escaner OBD-II", "Gato hidraulico 2T"],
+            "cambio_aceite_proximo": ["Juego de llaves mixtas", "Gato hidraulico 2T"],
+        }
+
         for falla_id in fallas:
             repuestos = self.inventario.verificar_disponibilidad(falla_id)
             if repuestos:
                 nom_falla = self.explicador.DESCRIPCION_FALLAS.get(falla_id, falla_id)
                 lineas.append(f"  [{nom_falla}]")
+
+                # Repuestos
                 for r in repuestos:
-                    icono = "✅" if r.get("disponible") else "🔴"
+                    icono = "[OK]" if r.get("disponible") else "[X]"
                     alerta = ""
                     if r.get("alerta_stock") and r.get("disponible"):
-                        alerta = " ⚠️ Stock bajo"
+                        alerta = " [!] Stock bajo"
                     elif not r.get("disponible"):
-                        alerta = " 🔴 Agotado"
+                        alerta = " [X] AGOTADO — Solicitar pedido"
                     lineas.append(
                         f"    {icono} {r['nombre']} — ${r['precio']:,} "
                         f"(stock: {r['stock']}){alerta}"
                     )
+
+                # Herramientas necesarias
+                herramientas = herramientas_necesarias.get(falla_id, [])
+                if herramientas:
+                    lineas.append(f"    🛠️  Herramientas requeridas:")
+                    for h_nombre in herramientas:
+                        h_info = self.inventario.verificar_herramienta(h_nombre)
+                        if h_info:
+                            icono_h = "[OK]" if h_info["disponible"] else "[NO]"
+                            estado_h = "" if h_info["disponible"] else " — SIN STOCK"
+                            lineas.append(
+                                f"      {icono_h} {h_info['nombre']} "
+                                f"(stock: {h_info['stock']}){estado_h}"
+                            )
+
         if not lineas:
             return "  No hay repuestos asociados a las fallas detectadas."
         return "\n".join(lineas)
@@ -925,13 +1075,19 @@ class AgenteAutomotriz:
         for nombre, fc in d.fallas:
             desc = self.explicador.DESCRIPCION_FALLAS.get(nombre, nombre)
             sist = self.explicador.SISTEMAS.get(nombre, "")
-            barra = "█" * int(abs(fc) * 20) + "░" * (20 - int(abs(fc) * 20))
+            barra = "#" * int(abs(fc) * 20) + "." * (20 - int(abs(fc) * 20))
             lineas.append(f"  {desc:35s} [{sist:12s}] |{barra}| FC={fc:+.2f}")
 
         lineas.extend([
             "",
             "--- Estado de Inventario ---",
             d.estado_inventario,
+        ])
+
+        # Seccion de herramientas del taller
+        lineas.extend([
+            "",
+            self.inventario.resumen_taller(),
             "",
             "--- Plan de Acción Sugerido ---",
         ])
@@ -950,12 +1106,12 @@ class AgenteAutomotriz:
         if alertas_inv:
             lineas.extend([
                 "",
-                "📦 Alertas de Inventario (predicción de demanda):",
+                "[B] Alertas de Inventario (predicción de demanda):",
             ])
             for a in alertas_inv:
                 nom = self.explicador.DESCRIPCION_FALLAS.get(a["falla"], a["falla"])
                 lineas.append(
-                    f"  ⚠️  {a['repuesto']} — stock: {a['stock']}, "
+                    f"  [!]  {a['repuesto']} — stock: {a['stock']}, "
                     f"mín: {a['minimo']}, demanda est.: {a['demanda_estimada']}"
                 )
                 lineas.append(
@@ -1041,28 +1197,15 @@ def demo():
     print("=" * 60)
 
     api_key = os.environ.get("GEMINI_API_KEY", "")
-    usar_ia = False
-    while True:
-        respuesta = input("\n  ¿Desea usar Gemini para mejorar el diagnóstico? (s/n): ").strip().lower()
-        if respuesta == "s":
-            if not api_key:
-                api_key = input("  Ingrese API Key de Gemini (o Enter para omitir): ").strip()
-            if api_key:
-                usar_ia = True
-                print("  Inicializando Gemini...")
-                break
-            else:
-                print("  Continuando sin Gemini.")
-                break
-        elif respuesta == "n":
-            break
-        print("  Responda 's' o 'n'.")
-
-    agente = AgenteAutomotriz(api_key=api_key if usar_ia else None)
+    if not api_key:
+        api_key = input("\n  API Key de Gemini (Enter para omitir, siempre integrada si se provee): ").strip()
+    if api_key:
+        print("  Gemini activado — mejorando diagnosticos con IA")
+    agente = AgenteAutomotriz(api_key=api_key or None)
 
     while True:
         print("\n" + "=" * 50)
-        print("   🚗 NUEVO VEHÍCULO")
+        print("   [V] NUEVO VEHÍCULO")
         print("=" * 50)
         print("  (Escriba '0' en cualquier campo para volver al menú principal)")
 
@@ -1128,10 +1271,10 @@ def demo():
         predicciones = agente.predecir_fallas(vehiculo)
         if predicciones:
             for nombre, fc, desc in predicciones:
-                barra = "█" * int(fc * 20) + "░" * (20 - int(fc * 20))
+                barra = "#" * int(fc * 20) + "." * (20 - int(fc * 20))
                 nom = agente.explicador.DESCRIPCION_FALLAS.get(nombre, nombre)
                 print(f"  • {nom:45s} |{barra}| FC={fc:.2f}")
-                print(f"    → {desc}")
+                print(f"    -> {desc}")
         else:
             print("  No se detectan predicciones relevantes.")
 
@@ -1162,7 +1305,7 @@ def demo():
                     exitoso=True,
                 )
                 agente.cbr.aprender_caso(caso)
-                print("  ✅ Caso guardado exitosamente.")
+                print("  [OK] Caso guardado exitosamente.")
 
         # --- 8. CONSUMIR REPUESTO ---
         if diagnostico.fallas:
@@ -1172,11 +1315,34 @@ def demo():
             if resp == "s":
                 falla_id = diagnostico.fallas[0][0]
                 if agente.inventario.consumir_repuesto(falla_id):
-                    print(f"  ✅ Repuesto consumido para '{falla_id}'.")
+                    print(f"  [OK] Repuesto consumido para '{falla_id}'.")
                 else:
-                    print(f"  ❌ No hay stock disponible para '{falla_id}'.")
+                    print(f"  [NO] No hay stock disponible para '{falla_id}'.")
 
-        # --- 9. ¿CONTINUAR? ---
+        # --- 9. CONSUMIR HERRAMIENTA ---
+        if diagnostico.fallas:
+            resp = input(
+                "\n  ¿Necesita usar alguna herramienta del taller? (s/n): "
+            ).strip().lower()
+            if resp == "s":
+                print("\n  Herramientas disponibles:")
+                herramientas = agente.inventario.inventario.get("herramientas", {}).get("items", [])
+                opciones_h = {}
+                for i, h in enumerate(herramientas, 1):
+                    estado = "[OK]" if h["stock"] > 0 else "[NO]"
+                    print(f"    [{i}] {estado} {h['nombre']} (stock: {h['stock']})")
+                    opciones_h[str(i)] = h["nombre"]
+                if opciones_h:
+                    print("    [0] Cancelar")
+                    op_h = input("  Opción: ").strip()
+                    if op_h in opciones_h:
+                        nombre_h = opciones_h[op_h]
+                        if agente.inventario.consumir_herramienta(nombre_h):
+                            print(f"  [OK] Herramienta '{nombre_h}' asignada al trabajo.")
+                        else:
+                            print(f"  [NO] '{nombre_h}' no tiene stock disponible.")
+
+        # --- 10. ¿CONTINUAR? ---
         print("\n" + "-" * 50)
         seguir = input("  ¿Atender otro vehículo? (s/n): ").strip().lower()
         if seguir != "s":
