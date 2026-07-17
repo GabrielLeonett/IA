@@ -1,0 +1,111 @@
+@startuml
+skinparam component {
+  BackgroundColor #F8F8FF
+  BorderColor #6A5ACD
+}
+skinparam node {
+  BackgroundColor #FFF0F5
+  BorderColor #DB7093
+}
+
+title "Arquitectura de Componentes - Agente Cognitivo Automotriz"
+
+node "Interfaz de Usuario" as UI {
+  component "Formulario Síntomas" as FrmSint
+  component "Lector OBD-II" as OBD
+  component "Reporte Diagnóstico" as Report
+}
+
+node "Agente Cognitivo Automotriz" as Agent {
+  package "Núcleo BDI" as BDI {
+    component "Perceptor" as Perceptor
+    component "Filtro" as Filter
+    component "Evaluador de Metas" as Evaluator
+    component "Planificador" as Planner
+  }
+
+  package "Razonamiento" as Reason {
+    component "Motor Inferencia\n(Forward Chaining)" as Inference
+    component "Calculador FC\n(Shortliffe-Buchanan)" as CFCalc
+    component "Gestor CBR" as CBR
+    component "Explicador" as Explainer
+  }
+
+  package "Conocimiento" as KB {
+    component "Base de Reglas" as Rules
+    component "Ontología" as Ontology
+    component "Casos Históricos" as Cases
+  }
+
+  package "Gestión" as Mgmt {
+    component "Gestor Inventario" as Inventory
+    component "Gestor Repuestos" as Parts
+  }
+
+  package "Salida" as Output {
+    component "Generador Diagnóstico" as Diag
+    component "Generador Plan Acción" as Plan
+    component "Generador Explicación" as Expl
+  }
+}
+
+' Flujo principal
+UI --> Perceptor : síntomas + OBD
+Perceptor --> Filter : datos crudos
+Filter --> Inference : hechos normalizados
+Inference --> Rules : consulta
+Rules --> Ontology : validación semántica
+Inference --> CFCalc : calcula FC
+CFCalc --> Evaluator : hipótesis con FC
+Evaluator --> Planner : metas priorizadas
+Planner --> Inference : refinamiento (loop)
+
+' CBR
+Inference --> CBR : casos similares
+CBR --> Cases : consulta
+CBR --> Inference : FC ajustado
+
+' Explicación en paralelo
+Inference --> Explainer : reglas activadas + FC
+Explainer --> Expl : texto explicativo
+
+' Salidas
+Evaluator --> Diag : diagnóstico final
+Planner --> Plan : plan de acción
+Plan --> Inventory : verifica repuestos
+Inventory --> Parts : stock
+Parts --> Plan : disponibilidad
+Plan --> Report : reporte final
+Expl --> Report : explicación
+Diag --> Report : diagnóstico
+
+Report --> UI : resultado al usuario
+
+note top of Agent
+  **Ciclo BDI completo:**
+  1. Percibe (síntomas + OBD + histrial)
+  2. Filtra (normaliza, valida, agrupa)
+  3. Razona (reglas + FC + CBR)
+  4. Evalúa metas (Seg > Efe > Efi)
+  5. Planifica (según urgencia)
+  6. Actúa (diagnóstico + plan + explicación)
+end note
+
+note right of Rules
+  15-20 reglas de producción
+  con Factores de Certeza.
+  Ejemplo:
+  SI dificultad_arranque Y luces_debiles
+  ENTONCES bateria_descargada FC=0.85
+end note
+
+note bottom of CFCalc
+  **Combinación de evidencias:**
+  Confluyentes:
+  CF = CF1 + CF2 - CF1*CF2
+
+  Contradictorias:
+  CF = (CF1 + CF2) / (1 - min(|CF1|,|CF2|))
+end note
+
+@enduml

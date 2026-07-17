@@ -1,0 +1,96 @@
+@startuml
+skinparam activity {
+  BackgroundColor #F5F5F5
+  BorderColor #333333
+}
+skinparam note {
+  BackgroundColor #FFFFDD
+  BorderColor #CCCC00
+}
+
+title "Ciclo de Razonamiento BDI - Agente Automotriz"
+
+|#F0F0F0|**Percepción** (Adquirir Datos)|
+start
+:Usuario reporta síntomas (voz / formulario);
+:Leer códigos OBD-II vía ELM327 Bluetooth;
+:Obtener datos del vehículo (VIN, km, año);
+:Consultar historial de mantenimiento;
+
+|#E8F0FE|**Filtro** (Normalizar y Validar)|
+:Validar severidad de síntomas (escala 1-10);
+:Descartar síntomas redundantes o irrelevantes;
+:Normalizar códigos DTC a formato estándar;
+:Agrupar síntomas por categoría (motor, frenos, etc.);
+
+note right
+  Ejemplo:
+  "carro no prende" -> dificultad_arranque
+  "check engine" -> testigo_motor_encendido
+end note
+
+|#E8FFE8|**Razonamiento** (Creencias -> Hipótesis)|
+:Consultar Base de Conocimiento (Reglas);
+:Disparar reglas aplicables (forward chaining);
+:Calcular FC individual por regla;
+:Agrupar evidencias por hipótesis (falla);
+
+while (¿Evidencias confluyentes?) is (sí)
+  :Aplicar FC_combinado = FC1 + FC2 - FC1*FC2;
+  :Actualizar FC de la hipótesis;
+endwhile
+:Evaluar evidencias contradictorias;
+:Aplicar combinación contradictoria si existe;
+
+:Consultar casos históricos similares (CBR);
+:Ajustar FC según similitud con casos previos;
+
+|#FFF8DC|**Evaluación** (Deseos -> Priorizar)|
+:Ordenar hipótesis por FC descendente;
+:Identificar fallas de seguridad (frenos/dirección);
+
+if (¿Falla crítica de seguridad con FC > 0.3?) then (sí)
+  :Activar **MetaSeguridad** (prioridad 1);
+  :Forzar NivelUrgencia = **Rojo**;
+else (no)
+  if (¿FC >= 0.7?) then (sí)
+    :Activar **MetaEfectividad** (prioridad 2);
+    :Clasificar urgencia según reglas;
+  else (no)
+    :Activar modo de refinamiento;
+    :Solicitar síntomas adicionales al usuario;
+    note right: Ciclo de refinamiento\n(preguntar más detalles)
+    backward
+  endif
+endif
+
+|#FFE0E0|**Planificación** (Intenciones -> Plan)|
+:Seleccionar plan de acción según urgencia;
+
+if (NivelUrgencia == Rojo) then
+  :Plan: Derivar a taller especializado URGENTE;
+  :Acción: No conducir el vehículo;
+elseif (NivelUrgencia == Amarillo) then
+  :Plan: Programar reparación en < 24h;
+  :Verificar stock de repuestos necesarios;
+  if (¿Hay stock?) then (sí)
+    :Reservar repuestos;
+  else (no)
+    :Activar MetaEficiencia;
+    :Sugerir repuesto alternativo compatible;
+  endif
+else (Verde)
+  :Plan: Agendar mantenimiento preventivo;
+  :Calcular próxima fecha según kilometraje;
+endif
+
+|#F0F0F0|**Actuación** (Generar Salida)|
+:Generar diagnóstico estructurado;
+:Generar explicación textual (reglas activadas + FC);
+:Generar plan de acción paso a paso con costos;
+:Guardar caso en base de datos histórica (CBR);
+:Enviar reporte al usuario;
+
+stop
+
+@enduml

@@ -1,0 +1,135 @@
+@startuml
+left to right direction
+skinparam packageStyle rectangle
+skinparam class {
+  BackgroundColor #F0F8FF
+  BorderColor #4682B4
+}
+
+' ========== CREENCIAS (Beliefs) ==========
+package "Creencias (Beliefs) - Ontología del Dominio" {
+  class Vehiculo {
+    + VIN: string
+    + marca: string
+    + modelo: string
+    + año: int
+    + kilometraje: float
+    + tipo_motor: string
+    + transmision: string
+  }
+
+  class Usuario {
+    + id: string
+    + nombre: string
+    + rol: enum {conductor, mecanico}
+  }
+
+  class Sintoma {
+    + id: string
+    + descripcion: string
+    + severidad: int (1-10)
+    + duracion_horas: float
+    + categoria: enum {motor, frenos, direccion, electrico, suspension}
+  }
+
+  class SensorOBD {
+    + codigo_DTC: string
+    + descripcion_oficial: string
+    + sistema: string
+    + es_critico: boolean
+  }
+
+  class Falla {
+    + id: string
+    + nombre: string
+    + descripcion: string
+    + sistema_afectado: string
+    + frecuencia_estimada: string
+  }
+
+  class NivelUrgencia {
+    + nivel: enum {Rojo, Amarillo, Verde}
+    + tiempo_respuesta: string
+    + accion_sugerida: string
+  }
+
+  class Repuesto {
+    + codigo: string
+    + nombre: string
+    + stock_actual: int
+    + precio: float
+    + tiempo_entrega_dias: int
+  }
+
+  class AccionMantenimiento {
+    + id: string
+    + descripcion: string
+    + costo_estimado: float
+    + tiempo_estimado_horas: float
+    + dificultad: enum {baja, media, alta}
+  }
+
+  class HistorialMantenimiento {
+    + fecha: datetime
+    + kilometraje: float
+    + falla_diagnosticada: string
+    + acciones_realizadas: string
+    + costo_total: float
+  }
+}
+
+' ========== RELACIONES ==========
+Usuario "1" --> "0..*" Sintoma : reporta >
+Vehiculo "1" --> "0..*" SensorOBD : tiene instalado >
+Vehiculo "1" --> "0..*" HistorialMantenimiento : registra >
+Sintoma "0..*" --> "0..*" Falla : indica (FC) >
+SensorOBD "0..*" --> "0..*" Falla : confirma con >
+Falla "1" --> "1" NivelUrgencia : se clasifica como >
+Falla "1" --> "1..*" AccionMantenimiento : requiere >
+AccionMantenimiento "1..*" --> "0..*" Repuesto : necesita >
+HistorialMantenimiento "0..*" --> "0..*" Falla : tuvo >
+Sintoma --> SensorOBD : correlaciona con >
+
+' ========== DESEOS (Desires) ==========
+package "Deseos (Desires) - Metas del Agente" {
+  class MetaSeguridad {
+    + prioridad: 1
+    + descripcion: "No errar falla crítica (frenos, direccion, airbag)"
+    + tolerancia_error: 0%
+  }
+  class MetaEfectividad {
+    + prioridad: 2
+    + descripcion: "Diagnóstico correcto con FC >= 0.7"
+    + tolerancia_error: < 30%
+  }
+  class MetaEficiencia {
+    + prioridad: 3
+    + descripcion: "Minimizar costo y tiempo de reparacion"
+    + tolerancia_error: < 50%
+  }
+}
+
+MetaSeguridad --> NivelUrgencia : exige clasificar Rojo >
+MetaEfectividad --> Falla : valida FC minimo >
+MetaEficiencia --> AccionMantenimiento : optimiza costo >
+
+note right of NivelUrgencia
+  **Rojo**:   actuar < 1h
+  (falla activa: frenos, direccion, airbag)
+
+  **Amarillo**: actuar < 24h
+  (falla inminente: motor, electrica)
+
+  **Verde**:   monitoreo mensual
+  (mantenimiento preventivo)
+end note
+
+note right of MetaSeguridad
+  Seguridad > Efectividad > Eficiencia
+  El orden es crítico porque:
+  - Un falso negativo en frenos es mortal
+  - Un diagnóstico incorrecto genera costos
+  - La eficiencia sin seguridad es riesgosa
+end note
+
+@enduml
